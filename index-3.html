@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ImageShift — Format Converter</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #2a2a3a;
+      --accent: #00e5ff;
+      --accent2: #ff4f8b;
+      --text: #e8e8f0;
+      --muted: #666680;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow-orb {
+      position: fixed;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);
+      top: -150px; left: -150px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-orb2 {
+      position: fixed;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,79,139,0.07) 0%, transparent 70%);
+      bottom: -100px; right: -100px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 52px;
+      animation: fadeDown 0.7s ease both;
+    }
+
+    .logo-tag {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,255,0.3);
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -1px;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    /* Drop Zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 20px;
+      padding: 52px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--surface);
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.7s 0.1s ease both;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0,229,255,0.04), rgba(255,79,139,0.04));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      box-shadow: 0 0 40px rgba(0,229,255,0.1), inset 0 0 40px rgba(0,229,255,0.03);
+    }
+    .drop-zone:hover::before, .drop-zone.drag-over::before { opacity: 1; }
+
+    .drop-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      display: block;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .drop-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .drop-sub {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .browse-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 28px;
+      background: linear-gradient(135deg, var(--accent), #0099cc);
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .browse-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,229,255,0.3);
+    }
+
+    #fileInput { display: none; }
+
+    /* Preview Grid */
+    #previewSection {
+      display: none;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 36px 0 14px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .preview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+      position: relative;
+    }
+    .preview-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+    .preview-card img {
+      width: 100%;
+      height: 110px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .preview-card .card-info {
+      padding: 8px 10px;
+    }
+    .card-name {
+      font-size: 0.7rem;
+      font-family: 'DM Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .card-size {
+      font-size: 0.65rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 22px; height: 22px;
+      background: rgba(255,79,139,0.85);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+      transition: transform 0.2s;
+    }
+    .remove-btn:hover { transform: scale(1.2); }
+
+    /* Controls */
+    .controls-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      margin-top: 4px;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+    }
+
+    .control-group {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    label {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+      background: #1c1c28;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      border-radius: 10px;
+      outline: none;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    select:focus, select:hover { border-color: var(--accent); }
+
+    input[type="range"] {
+      padding: 6px 0;
+      accent-color: var(--accent);
+      border: none;
+      background: transparent;
+    }
+
+    .quality-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      text-align: right;
+      margin-top: 4px;
+    }
+
+    .convert-btn {
+      width: 100%;
+      margin-top: 20px;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--accent) 0%, #0099cc 50%, var(--accent2) 100%);
+      background-size: 200% 200%;
+      border: none;
+      border-radius: 14px;
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: background-position 0.4s, transform 0.2s, box-shadow 0.2s;
+      animation: fadeUp 0.5s 0.2s ease both;
+    }
+    .convert-btn:hover {
+      background-position: right center;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 36px rgba(0,229,255,0.25);
+    }
+    .convert-btn:active { transform: translateY(0); }
+    .convert-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress */
+    #progressBar {
+      display: none;
+      margin-top: 16px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* Result */
+    #resultSection {
+      display: none;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid rgba(0,229,255,0.2);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+    .result-card:hover { transform: translateY(-4px); }
+
+    .result-card img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .result-info {
+      padding: 12px 14px;
+    }
+    .result-name {
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .result-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .result-size {
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    .dl-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      background: rgba(0,229,255,0.1);
+      border: 1px solid rgba(0,229,255,0.3);
+      color: var(--accent);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      border-radius: 20px;
+      text-decoration: none;
+      transition: background 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+    .dl-btn:hover {
+      background: rgba(0,229,255,0.2);
+      transform: translateY(-1px);
+    }
+
+    .dl-all-btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 13px;
+      background: transparent;
+      border: 1px solid rgba(0,229,255,0.4);
+      color: var(--accent);
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .dl-all-btn:hover {
+      background: rgba(0,229,255,0.08);
+      transform: translateY(-2px);
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface);
+      border: 1px solid rgba(0,229,255,0.3);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 12px 24px;
+      border-radius: 30px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 100;
+      pointer-events: none;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-orb"></div>
+  <div class="glow-orb2"></div>
+
+  <div class="container">
+    <header>
+      <div class="logo-tag">⚡ ImageShift</div>
+      <h1>Convert Images<br/><span>Instantly.</span></h1>
+      <p class="subtitle">JPG · PNG · WebP — drag, drop, done.</p>
+    </header>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <span class="drop-icon">🖼️</span>
+      <div class="drop-title">Drop images here</div>
+      <div class="drop-sub">Supports JPG, PNG, WebP, GIF, BMP</div>
+      <button class="browse-btn" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+      <input type="file" id="fileInput" multiple accept="image/*"/>
+    </div>
+
+    <!-- Preview -->
+    <div id="previewSection">
+      <div class="section-label">Selected Images</div>
+      <div class="preview-grid" id="previewGrid"></div>
+
+      <div class="section-label">Conversion Settings</div>
+      <div class="controls-box">
+        <div class="controls-row">
+          <div class="control-group">
+            <label>Output Format</label>
+            <select id="formatSelect">
+              <option value="image/jpeg">JPEG</option>
+              <option value="image/png">PNG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label>Quality — <span id="qualityVal">90</span>%</label>
+            <input type="range" id="qualityRange" min="10" max="100" value="90" step="5"/>
+          </div>
+        </div>
+      </div>
+
+      <button class="convert-btn" id="convertBtn">⚡ Convert All Images</button>
+      <div id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultSection">
+      <div class="section-label">Converted Files</div>
+      <div class="result-grid" id="resultGrid"></div>
+      <button class="dl-all-btn" id="dlAllBtn">⬇ Download All</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewSection = document.getElementById('previewSection');
+    const previewGrid = document.getElementById('previewGrid');
+    const qualityRange = document.getElementById('qualityRange');
+    const qualityVal = document.getElementById('qualityVal');
+    const convertBtn = document.getElementById('convertBtn');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const resultSection = document.getElementById('resultSection');
+    const resultGrid = document.getElementById('resultGrid');
+    const dlAllBtn = document.getElementById('dlAllBtn');
+
+    let files = [];
+    let convertedBlobs = [];
+
+    // Drag & Drop
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+    });
+    fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
+
+    function handleFiles(newFiles) {
+      if (!newFiles.length) return;
+      files = [...files, ...newFiles];
+      renderPreviews();
+      previewSection.style.display = 'block';
+      resultSection.style.display = 'none';
+      convertedBlobs = [];
+    }
+
+    function renderPreviews() {
+      previewGrid.innerHTML = '';
+      files.forEach((file, i) => {
+        const url = URL.createObjectURL(file);
+        const card = document.createElement('div');
+        card.className = 'preview-card';
+        card.innerHTML = `
+          <img src="${url}" alt="${file.name}"/>
+          <div class="card-info">
+            <div class="card-name">${file.name}</div>
+            <div class="card-size">${formatBytes(file.size)}</div>
+          </div>
+          <button class="remove-btn" data-index="${i}" title="Remove">✕</button>`;
+        previewGrid.appendChild(card);
+      });
+      previewGrid.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          files.splice(parseInt(e.target.dataset.index), 1);
+          if (!files.length) previewSection.style.display = 'none';
+          else renderPreviews();
+        });
+      });
+    }
+
+    qualityRange.addEventListener('input', () => qualityVal.textContent = qualityRange.value);
+
+    // Convert
+    convertBtn.addEventListener('click', async () => {
+      if (!files.length) return;
+      convertBtn.disabled = true;
+      resultSection.style.display = 'none';
+      progressBar.style.display = 'block';
+      progressFill.style.width = '0%';
+      convertedBlobs = [];
+      resultGrid.innerHTML = '';
+
+      const format = document.getElementById('formatSelect').value;
+      const quality = parseInt(qualityRange.value) / 100;
+      const ext = format === 'image/jpeg' ? 'jpg' : format === 'image/png' ? 'png' : 'webp';
+
+      for (let i = 0; i < files.length; i++) {
+        const blob = await convertImage(files[i], format, quality);
+        const baseName = files[i].name.replace(/\.[^.]+$/, '');
+        const outName = `${baseName}.${ext}`;
+        convertedBlobs.push({ blob, name: outName });
+
+        const url = URL.createObjectURL(blob);
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.innerHTML = `
+          <img src="${url}" alt="${outName}"/>
+          <div class="result-info">
+            <div class="result-name">${outName}</div>
+            <div class="result-meta">
+              <span class="result-size">${formatBytes(blob.size)}</span>
+              <a class="dl-btn" href="${url}" download="${outName}">⬇ Save</a>
+            </div>
+          </div>`;
+        resultGrid.appendChild(card);
+
+        progressFill.style.width = `${((i + 1) / files.length) * 100}%`;
+      }
+
+      setTimeout(() => {
+        progressBar.style.display = 'none';
+        resultSection.style.display = 'block';
+        convertBtn.disabled = false;
+        showToast(`✅ ${files.length} image${files.length > 1 ? 's' : ''} converted!`);
+      }, 300);
+    });
+
+    function convertImage(file, format, quality) {
+      return new Promise(resolve => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (format === 'image/jpeg') {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob(blob => resolve(blob), format, quality);
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      });
+    }
+
+    // Download All
+    dlAllBtn.addEventListener('click', async () => {
+      if (!convertedBlobs.length) return;
+      for (const { blob, name } of convertedBlobs) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        await new Promise(r => setTimeout(r, 200));
+      }
+      showToast('⬇ All files downloading…');
+    });
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>
